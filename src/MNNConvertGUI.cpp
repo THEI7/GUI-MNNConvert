@@ -337,7 +337,7 @@ void MNNConvertGUI::RenderButton(const SDL_Rect& rect, const std::string& text, 
             display_text = "×";
         }
 
-        SDL_Surface* text_surface = TTF_RenderUTF8_Shaded(font_, display_text.c_str(), text_color,text_bg_color);
+        SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font_, display_text.c_str(), text_color);
         if (text_surface) {
             int text_w = text_surface->w;
             int text_h = text_surface->h;
@@ -365,8 +365,8 @@ void MNNConvertGUI::RenderButton(const SDL_Rect& rect, const std::string& text, 
 void MNNConvertGUI::RenderText(const std::string& text, int x, int y, SDL_Color color, SDL_Color bg_color) {
     if (!font_ || text.empty()) return;
     
-    // 使用UTF-8渲染，支持中文，使用Shaded模式实现抗锯齿和背景
-    SDL_Surface* text_surface = TTF_RenderUTF8_Shaded(font_, text.c_str(), color, bg_color);
+    // 使用UTF-8渲染，支持中文，使用Blended模式以获得最佳抗锯齿
+    SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font_, text.c_str(), color);
     if (!text_surface) {
         std::cerr << "[WARNING] 文本渲染失败: " << TTF_GetError() << " 文本: " << text << std::endl;
         return;
@@ -400,8 +400,8 @@ void MNNConvertGUI::RenderText(const std::string& text, int x, int y, SDL_Color 
 void MNNConvertGUI::RenderCenteredText(const std::string& text, int center_x, int y, SDL_Color color, SDL_Color bg_color) {
     if (!font_ || text.empty()) return;
     
-    // 使用UTF-8渲染，支持中文，使用Shaded模式实现抗锯齿和背景
-    SDL_Surface* text_surface = TTF_RenderUTF8_Shaded(font_, text.c_str(), color, bg_color);
+    // 使用UTF-8渲染，支持中文，使用Blended模式以获得最佳抗锯齿
+    SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font_, text.c_str(), color);
     if (!text_surface) {
         std::cerr << "[WARNING] 文本渲染失败: " << TTF_GetError() << " 文本: " << text << std::endl;
         return;
