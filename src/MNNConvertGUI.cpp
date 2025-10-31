@@ -147,7 +147,7 @@ bool MNNConvertGUI::Initialize(int width, int height) {
     
     font_ = nullptr;
     for (int i = 0; chinese_fonts[i] != nullptr; i++) {
-        font_ = TTF_OpenFont(chinese_fonts[i], 16);
+        font_ = TTF_OpenFont(chinese_fonts[i], 18);
         if (font_) {
             break;
         }
@@ -433,17 +433,11 @@ void MNNConvertGUI::RenderCenteredText(const std::string& text, int center_x, in
  * @param is_active 是否为活跃状态
  */
 void MNNConvertGUI::RenderInputField(const SDL_Rect& rect, const std::string& text, bool is_active) {
-    // 绘制输入框背景
-    SDL_SetRenderDrawColor(renderer_, 
-        color_input_bg_.r, color_input_bg_.g, color_input_bg_.b, color_input_bg_.a);
-    SDL_RenderFillRect(renderer_, &rect);
+    // 绘制输入框背景（圆角）
+    int radius = std::min(rect.h / 2, 10);
+    RenderRoundedRect(rect, radius, color_input_bg_, true);
     
-    // 绘制输入框边框（抗锯齿）
-    SDL_Color border_color = is_active ? color_button_ : SDL_Color{128, 128, 128, 255};
-    aalineRGBA(renderer_, rect.x, rect.y, rect.x + rect.w - 1, rect.y, border_color.r, border_color.g, border_color.b, border_color.a);
-    aalineRGBA(renderer_, rect.x, rect.y + rect.h - 1, rect.x + rect.w - 1, rect.y + rect.h - 1, border_color.r, border_color.g, border_color.b, border_color.a);
-    aalineRGBA(renderer_, rect.x, rect.y, rect.x, rect.y + rect.h - 1, border_color.r, border_color.g, border_color.b, border_color.a);
-    aalineRGBA(renderer_, rect.x + rect.w - 1, rect.y, rect.x + rect.w - 1, rect.y + rect.h - 1, border_color.r, border_color.g, border_color.b, border_color.a);
+    // 不绘制边框线条，保持纯色圆角背景
     
     // 渲染输入文本 - 使用黑色文字以便在白色背景上可见
     if (!text.empty()) {
@@ -1629,7 +1623,7 @@ void MNNConvertGUI::ShowFilenameDialog() {
         GetDropZoneColors(zone_c, border_c);
         (void)border_c;
         dialog_bg_start_color_ = zone_c;
-        dialog_bg_target_color_ = {240, 240, 240, 255};
+        dialog_bg_target_color_ = {220, 220, 220, 255};
         dialog_bg_anim_start_ = SDL_GetTicks();
         dialog_bg_animating_ = true;
     }
@@ -1761,7 +1755,7 @@ void MNNConvertGUI::RenderFilenameDialog() {
     
     // 绘制对话框背景（圆角）
     int dialog_radius = 12;
-    SDL_Color dialog_bg = {240, 240, 240, 255};
+    SDL_Color dialog_bg = {220, 220, 220, 255};
     if (dialog_bg_animating_) {
         Uint32 now = SDL_GetTicks();
         Uint32 elapsed = now - dialog_bg_anim_start_;
