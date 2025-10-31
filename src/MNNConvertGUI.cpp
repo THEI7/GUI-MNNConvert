@@ -266,6 +266,9 @@ void MNNConvertGUI::Update() {
     
     // 检查转换结果
     CheckConversionResult();
+
+    // 更新拖拽区域缩放动画
+    UpdateDropZoneAnimation();
 }
 
 /**
@@ -375,6 +378,9 @@ void MNNConvertGUI::RenderText(const std::string& text, int x, int y, SDL_Color 
         SDL_FreeSurface(text_surface);
         return;
     }
+    // 使透明度渐变生效
+    SDL_SetTextureBlendMode(text_texture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(text_texture, color.a);
     
     SDL_Rect dest_rect = {x, y, text_surface->w, text_surface->h};
     SDL_RenderCopy(renderer_, text_texture, nullptr, &dest_rect);
@@ -407,6 +413,9 @@ void MNNConvertGUI::RenderCenteredText(const std::string& text, int center_x, in
         SDL_FreeSurface(text_surface);
         return;
     }
+    // 使透明度渐变生效
+    SDL_SetTextureBlendMode(text_texture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(text_texture, color.a);
     
     // 计算居中位置：中心X坐标减去文本宽度的一半
     int x = center_x - text_surface->w / 2;
@@ -909,36 +918,18 @@ std::string MNNConvertGUI::FallbackSaveFileDialog(const std::string& default_nam
  * @brief 渲染拖拽区域
  */
 void MNNConvertGUI::RenderDropZone() {
-    // 定义拖拽区域 - 更大更居中
-    int margin = 80;
-    int top_margin = 100;
-    SDL_Rect drop_zone = {margin, top_margin, window_width_ - 2 * margin, window_height_ - top_margin - 120};
+    // 获取默认拖拽区域（若未初始化当前矩形则进行初始化）
+    SDL_Rect default_rect = ComputeDefaultDropZoneRect();
+    if (!drop_rect_initialized_) {
+        drop_rect_current_ = default_rect;
+        drop_rect_initialized_ = true;
+    }
+    SDL_Rect drop_zone = drop_rect_current_;
     
     // 选择颜色 - 根据不同状态显示不同颜色
     SDL_Color zone_color;
     SDL_Color border_color;
-    
-    if (show_conversion_success_) {
-        // 转换完成后显示绿色2秒
-        zone_color = {20, 80, 20, 255};
-        border_color = {50, 200, 50, 255};
-    } else if (is_dragging_over_) {
-        // 拖拽悬停时显示白色
-        zone_color = {200, 200, 200, 255};
-        border_color = {150, 150, 150, 255};
-    } else if (is_converting_) {
-        // 正在转换时显示橙色
-        zone_color = {60, 40, 10, 255};
-        border_color = {200, 150, 50, 255};
-    } else if (!input_file_path_.empty()) {
-        // 有文件时 - 深绿色背景，绿色边框
-        zone_color = {20, 40, 20, 255};
-        border_color = {50, 150, 50, 255};
-    } else {
-        // 没有文件时 - 深灰色背景，淡色边框
-        zone_color = {20, 40, 20, 255};
-        border_color = {50, 150, 50, 255};
-    }
+    GetDropZoneColors(zone_color, border_color);
     
     // 圆角半径
     int corner_radius = 20;
@@ -946,10 +937,34 @@ void MNNConvertGUI::RenderDropZone() {
     // 绘制圆角背景
     RenderRoundedRect(drop_zone, corner_radius, zone_color, true);
     
-    // 绘制圆角虚线边框
-    RenderRoundedRect(drop_zone, corner_radius, border_color, false);
+    // 不再绘制边框线条
     
     // 拖拽区域保持完全空白，不显示任何文字
+}
+
+void MNNConvertGUI::GetDropZoneColors(SDL_Color& zone_color, SDL_Color& border_color) const {
+    if (show_conversion_success_) {
+        zone_color = {20, 80, 20, 255};
+        border_color = {50, 200, 50, 255};
+        return;
+    }
+    if (is_dragging_over_) {
+        zone_color = {200, 200, 200, 255};
+        border_color = {150, 150, 150, 255};
+        return;
+    }
+    if (is_converting_) {
+        zone_color = {60, 40, 10, 255};
+        border_color = {200, 150, 50, 255};
+        return;
+    }
+    if (!input_file_path_.empty()) {
+        zone_color = {20, 40, 20, 255};
+        border_color = {50, 150, 50, 255};
+        return;
+    }
+    zone_color = {20, 40, 20, 255};
+    border_color = {50, 150, 50, 255};
 }
 
 /**
@@ -976,8 +991,25 @@ void MNNConvertGUI::RenderFileStatusInfo() {
         // Show yellow progress message when converting
         RenderCenteredText("Converting file: " + display_name + ", please wait...", center_x, info_y, {255, 200, 50, 255}, {240, 240, 240, 255});
     } else if (input_file_path_.empty()) {
-        // Usage instruction when no file - concise English version
-        RenderCenteredText("Drag and drop an .onnx file onto the area above to convert automatically", center_x, info_y, {0, 0, 0, 255}, {255, 255, 255, 255});
+        // 弹出输入对话框时不再渲染该提示，避免一帧突变
+        if (show_filename_dialog_) {
+            return;
+        }
+        // 无文件时提示；缩小动画中淡出，放大动画中淡入
+        Uint8 alpha = 255;
+        if (animating_drop_shrink_ || animating_drop_expand_) {
+            Uint32 now = SDL_GetTicks();
+            Uint32 elapsed = now - anim_start_time_;
+            float t = (anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(anim_duration_ms_));
+            float ease = (t < 0.5f) ? (2.0f * t * t) : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
+            float factor = animating_drop_shrink_ ? (1.0f - ease) : ease; // 缩小时 1->0, 放大时 0->1
+            int a = static_cast<int>(255.0f * factor);
+            if (a < 0) a = 0; if (a > 255) a = 255;
+            alpha = static_cast<Uint8>(a);
+        }
+        SDL_Color fg = {0, 0, 0, alpha};
+        SDL_Color bg = {255, 255, 255, 255};
+        RenderCenteredText("Drag and drop an .onnx file onto the area above to convert automatically", center_x, info_y, fg, bg);
     } else {
         std::string filename = GetBaseName(output_file_path_); // Assume output_file_path_ is the saved file path
         std::string display_name = filename.length() > 30 ? filename.substr(0, 27) + "..." : filename;
@@ -1021,8 +1053,8 @@ void MNNConvertGUI::HandleFileDrop(const char* file_path) {
     // 重置拖拽状态
     is_dragging_over_ = false;
     
-    // 显示图形化文件名输入对话框
-    ShowFilenameDialog();
+    // 启动拖拽区域缩放动画，动画结束后再弹出文件名输入对话框
+    BeginDropZoneShrinkAnimation();
 }
 
 
@@ -1591,7 +1623,79 @@ void MNNConvertGUI::ShowFilenameDialog() {
     // 启动文本输入
     SDL_StartTextInput();
     
+    // 启动对话框背景颜色渐变：从当前拖拽区域颜色过渡到对话框目标颜色
+    {
+        SDL_Color zone_c, border_c;
+        GetDropZoneColors(zone_c, border_c);
+        (void)border_c;
+        dialog_bg_start_color_ = zone_c;
+        dialog_bg_target_color_ = {240, 240, 240, 255};
+        dialog_bg_anim_start_ = SDL_GetTicks();
+        dialog_bg_animating_ = true;
+    }
+    
     ShowStatus(std::string("[INFO] 请输入输出文件名（不含扩展名），默认: ") + dialog_filename_input_);
+}
+
+SDL_Rect MNNConvertGUI::ComputeDefaultDropZoneRect() const {
+    int margin = 80;
+    int top_margin = 100;
+    SDL_Rect r {margin, top_margin, window_width_ - 2 * margin, window_height_ - top_margin - 120};
+    return r;
+}
+
+void MNNConvertGUI::BeginDropZoneShrinkAnimation() {
+    drop_rect_start_ = ComputeDefaultDropZoneRect();
+    // 目标为对话框的大小和位置
+    int dialog_width = 400;
+    int dialog_height = 200;
+    drop_rect_target_.x = (window_width_ - dialog_width) / 2;
+    drop_rect_target_.y = (window_height_ - dialog_height) / 2;
+    drop_rect_target_.w = dialog_width;
+    drop_rect_target_.h = dialog_height;
+    drop_rect_current_ = drop_rect_start_;
+    anim_start_time_ = SDL_GetTicks();
+    animating_drop_shrink_ = true;
+}
+
+void MNNConvertGUI::BeginDropZoneExpandAnimation() {
+    // 从对话框矩形恢复到默认拖拽区域
+    int dialog_width = 400;
+    int dialog_height = 200;
+    SDL_Rect dialog_rect { (window_width_ - dialog_width) / 2,
+                           (window_height_ - dialog_height) / 2,
+                           dialog_width,
+                           dialog_height };
+    drop_rect_start_ = dialog_rect;
+    drop_rect_target_ = ComputeDefaultDropZoneRect();
+    drop_rect_current_ = drop_rect_start_;
+    anim_start_time_ = SDL_GetTicks();
+    animating_drop_expand_ = true;
+}
+
+void MNNConvertGUI::UpdateDropZoneAnimation() {
+    if (!animating_drop_shrink_ && !animating_drop_expand_) return;
+    Uint32 now = SDL_GetTicks();
+    Uint32 elapsed = now - anim_start_time_;
+    float t = (anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(anim_duration_ms_));
+    // 缓入缓出（ease-in-out，采用二次插值）
+    float ease = (t < 0.5f)
+        ? (2.0f * t * t)
+        : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
+    auto lerp = [&](int a, int b) -> int { return a + static_cast<int>((b - a) * ease); };
+    drop_rect_current_.x = lerp(drop_rect_start_.x, drop_rect_target_.x);
+    drop_rect_current_.y = lerp(drop_rect_start_.y, drop_rect_target_.y);
+    drop_rect_current_.w = lerp(drop_rect_start_.w, drop_rect_target_.w);
+    drop_rect_current_.h = lerp(drop_rect_start_.h, drop_rect_target_.h);
+    if (t >= 1.0f) {
+        if (animating_drop_shrink_) {
+            animating_drop_shrink_ = false;
+            // 动画完成后弹出文件名输入对话框
+            ShowFilenameDialog();
+        } else if (animating_drop_expand_) {
+            animating_drop_expand_ = false;
+        }
+    }
 }
 
 /**
@@ -1601,6 +1705,8 @@ void MNNConvertGUI::HideFilenameDialog() {
     show_filename_dialog_ = false;
     dialog_input_active_ = false;
     SDL_StopTextInput();
+    // 对话框关闭后，拖拽区域从对话框大小恢复到默认大小
+    BeginDropZoneExpandAnimation();
 }
 
 /**
@@ -1656,6 +1762,21 @@ void MNNConvertGUI::RenderFilenameDialog() {
     // 绘制对话框背景（圆角）
     int dialog_radius = 12;
     SDL_Color dialog_bg = {240, 240, 240, 255};
+    if (dialog_bg_animating_) {
+        Uint32 now = SDL_GetTicks();
+        Uint32 elapsed = now - dialog_bg_anim_start_;
+        float t = (dialog_bg_anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(dialog_bg_anim_duration_ms_));
+        // 缓入缓出
+        float ease = (t < 0.5f) ? (2.0f * t * t) : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
+        auto lerpC = [&](Uint8 a, Uint8 b) -> Uint8 { return static_cast<Uint8>(a + (b - a) * ease); };
+        dialog_bg.r = lerpC(dialog_bg_start_color_.r, dialog_bg_target_color_.r);
+        dialog_bg.g = lerpC(dialog_bg_start_color_.g, dialog_bg_target_color_.g);
+        dialog_bg.b = lerpC(dialog_bg_start_color_.b, dialog_bg_target_color_.b);
+        dialog_bg.a = lerpC(dialog_bg_start_color_.a, dialog_bg_target_color_.a);
+        if (t >= 1.0f) {
+            dialog_bg_animating_ = false;
+        }
+    }
     RenderRoundedRect(dialog_rect_, dialog_radius, dialog_bg, true);
     
     // 绘制标题

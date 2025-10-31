@@ -165,6 +165,28 @@ private:
     bool SaveConfiguration();
     std::string GenerateOutputPath(const std::string& input_path);
     void ApplyConfigurationSettings();
+
+    // 拖拽区域缩放动画
+    bool animating_drop_shrink_ = false;
+    bool animating_drop_expand_ = false;
+    Uint32 anim_start_time_ = 0;
+    Uint32 anim_duration_ms_ = 400;
+    SDL_Rect drop_rect_start_ {0,0,0,0};
+    SDL_Rect drop_rect_target_ {0,0,0,0};
+    SDL_Rect drop_rect_current_ {0,0,0,0};
+    bool drop_rect_initialized_ = false;
+    SDL_Rect ComputeDefaultDropZoneRect() const;
+    void BeginDropZoneShrinkAnimation();
+    void BeginDropZoneExpandAnimation();
+    void UpdateDropZoneAnimation();
+
+    // 对话框颜色渐变动画
+    bool dialog_bg_animating_ = false;
+    Uint32 dialog_bg_anim_start_ = 0;
+    Uint32 dialog_bg_anim_duration_ms_ = 300;
+    SDL_Color dialog_bg_start_color_ {20, 40, 20, 255};
+    SDL_Color dialog_bg_target_color_ {240, 240, 240, 255};
+    void GetDropZoneColors(SDL_Color& zone_color, SDL_Color& border_color) const;
 };
 
 #endif // MNNCONVERTGUI_H
