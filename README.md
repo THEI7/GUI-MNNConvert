@@ -135,6 +135,13 @@ sudo make install
 sudo ldconfig
 ```
 
+### MNNConvert工具安装:
+[https://github.com/alibaba/MNN/wiki/convert#%E6%A8%A1%E5%9E%8B%E8%BD%AC%E6%8D%A2%E5%B7%A5%E5%85%B7](MNNconvert工具下载连接)
+```bash
+mkdir build && cd build && cmake .. -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=ON
+ && make -j8
+```
+
 ## 构建步骤
 
 ### 快速构建（推荐）:
