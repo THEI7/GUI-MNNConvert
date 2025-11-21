@@ -1,9 +1,9 @@
 # MNN模型转换工具配置文件
 # MNNConvert程序路径 - MNNConvert可执行文件的绝对路径
-mnnconvert_path: "/home/pozion/tools/MNN/MNNConvert"
+mnnconvert_path: "/home/fangjunjie/tools/MNN/MNNConvert"
 
 # 输出目录 - 转换后的MNN模型文件保存路径
-output_dir: "/home/pozion/tools/MNN"
+output_dir: "/home/fangjunjie/tools/MNN"
 
 # 业务代码 - MNN模型的业务标识
 biz_code: "biz"
@@ -14,4 +14,4 @@ auto_open_output_dir: true
 # 默认字体路径 - GUI界面使用的字体文件路径(可选)
 default_font: ""
 
-record_file_name: "seres_1031_11"
+record_file_name: "xxxxx"

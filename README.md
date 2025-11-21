@@ -25,7 +25,7 @@ sudo apt update
 sudo apt install cmake build-essential pkg-config
 
 # 安装SDL2图形库和字体库
-sudo apt install libsdl2-dev libsdl2-ttf-dev
+sudo apt install libsdl2-dev libsdl2-ttf-dev  libsdl2-gfx-dev
 
 # 安装YAML配置文件支持库
 sudo apt install libyaml-cpp-dev
@@ -146,14 +146,14 @@ mkdir build && cd build && cmake .. -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=O
 
 ### 快速构建（推荐）:
 ```bash
-cd /home/pozion/tools/MNN/myAPP
+cd /home/fangjunjie/tools/MNN/myAPP
 ./quick_rebuild.sh
 ```
 
 ### 手动构建:
 1. 进入项目目录:
 ```bash
-cd /home/pozion/tools/MNN/myAPP
+cd /home/fangjunjie/tools/MNN/myAPP
 ```
 
 2. 创建构建目录:
@@ -183,10 +183,10 @@ cd ..
 
 ```yaml
 # MNNConvert程序路径 - 可根据实际情况修改
-mnnconvert_path: "/home/pozion/tools/MNN/MNNConvert"
+mnnconvert_path: "/home/fangjunjie/tools/MNN/MNNConvert"
 
 # 输出目录 - 转换后文件的保存位置
-output_dir: "/home/pozion/tools/MNN"
+output_dir: "/home/fangjunjie/tools/MNN"
 
 # 业务代码 - 默认的bizCode参数
 biz_code: "biz"

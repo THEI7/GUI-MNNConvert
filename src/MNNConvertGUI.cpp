@@ -25,13 +25,13 @@ MNNConvertGUI::MNNConvertGUI()
     , input_file_selected_(false)
     , output_file_selected_(false)
     , active_input_field_(0)
-    , color_background_{255, 255, 255, 255}
-    , color_button_{70, 130, 180, 255}
-    , color_button_hover_{100, 149, 237, 255}
-    , color_text_{255, 255, 255, 255}
-    , color_input_bg_{255, 255, 255, 255}
-    , color_success_{34, 139, 34, 255}
-    , color_error_{220, 20, 60, 255}
+    , color_background_{245, 245, 247, 255}      // Apple Light Gray #F5F5F7
+    , color_button_{0, 122, 255, 255}            // Apple Blue #007AFF
+    , color_button_hover_{0, 98, 204, 255}       // Darker Blue
+    , color_text_{29, 29, 31, 255}               // Apple Dark Gray #1D1D1F
+    , color_input_bg_{255, 255, 255, 255}        // White
+    , color_success_{52, 199, 89, 255}           // Apple Green #34C759
+    , color_error_{255, 59, 48, 255}             // Apple Red #FF3B30
     , status_message_("")
     , show_status_(false)
     , status_start_time_(0)
@@ -50,6 +50,7 @@ MNNConvertGUI::MNNConvertGUI()
     , dialog_ok_button_{0, 0, 0, 0}
     , dialog_cancel_button_{0, 0, 0, 0}
     , dialog_input_active_(false)
+    , dialog_input_cursor_pos_(0)
     , mouse_x_(0)
     , mouse_y_(0)
     , config_file_path_("config/default.yaml") {
@@ -105,7 +106,7 @@ bool MNNConvertGUI::Initialize(int width, int height) {
         SDL_WINDOWPOS_CENTERED,
         window_width_,
         window_height_,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_MOUSE_FOCUS
+        SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_MOUSE_FOCUS | SDL_WINDOW_RESIZABLE
     );
 
     if (!window_) {
@@ -215,6 +216,35 @@ void MNNConvertGUI::HandleEvents() {
                 break;
             
             case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    window_width_ = event.window.data1;
+                    window_height_ = event.window.data2;
+                    // Re-compute drop zone rect or other layout
+                    drop_rect_initialized_ = false; // Force re-calc
+                    
+                    // If dialog is open, re-center it
+                    if (show_filename_dialog_) {
+                        int dialog_width = 400;
+                        int dialog_height = 200;
+                        dialog_rect_.x = (window_width_ - dialog_width) / 2;
+                        dialog_rect_.y = (window_height_ - dialog_height) / 2;
+                        
+                        // Re-position input and buttons
+                        dialog_input_rect_.x = dialog_rect_.x + 20;
+                        dialog_input_rect_.y = dialog_rect_.y + 80;
+                        
+                        int button_width = 80;
+                        int button_height = 30;
+                        int button_spacing = 20;
+                        int button_y = dialog_rect_.y + dialog_height - 50 + (dialog_input_rect_.h - 30) / 2;
+                        
+                        dialog_ok_button_.x = dialog_rect_.x + (dialog_width - 2 * button_width - button_spacing) / 2;
+                        dialog_ok_button_.y = button_y;
+                        
+                        dialog_cancel_button_.x = dialog_ok_button_.x + button_width + button_spacing;
+                        dialog_cancel_button_.y = button_y;
+                    }
+                }
                 break;
                 
             case SDL_MOUSEBUTTONDOWN:
@@ -302,42 +332,45 @@ void MNNConvertGUI::Render() {
  */
 void MNNConvertGUI::RenderButton(const SDL_Rect& rect, const std::string& text, bool is_hovered, int font_size) {
     (void)font_size; // 避免未使用参数警告
-    SDL_Color button_color = is_hovered ? color_button_hover_ : color_button_;
-    SDL_Color text_color = {0, 0, 0, 255};
-    SDL_Color text_bg_color = {0, 0, 0, 255};
-
-    // "确定"按钮：绿色背景，白色文字
+    
+    // Apple Style Buttons
+    // Primary (Confirm): Blue #007AFF
+    // Cancel: Clear/Red Text or Gray Background
+    
+    SDL_Color button_color;
+    SDL_Color text_color = {255, 255, 255, 255};
+    
     if (text == "确定") {
-        button_color = is_hovered ? SDL_Color{60, 180, 90, 255} : SDL_Color{34, 139, 34, 255};
-        text_color = SDL_Color{255, 255, 255, 255};
-        text_bg_color = button_color;
-    }
-    else if (text == "取消") {
-        button_color = is_hovered ? SDL_Color{255, 0, 0, 255} : SDL_Color{255, 0, 0, 255};
-        text_color = SDL_Color{255, 255, 255, 255};
-        text_bg_color = button_color;
-    }
-
-    // 使用圆角按钮
-    int corner_radius = 8;
-    RenderRoundedRect(rect, corner_radius, button_color, true);
-
-    // 对话框按钮（确定/取消）不绘制边框，其余按钮保留细边
-    if (!(text == "确定" || text == "取消")) {
-        SDL_Color border_color = {0, 0, 0, 255};
-        RenderRoundedRect(rect, corner_radius, border_color, false);
+        // iOS Primary Button Style
+        button_color = is_hovered ? SDL_Color{0, 98, 204, 255} : SDL_Color{0, 122, 255, 255}; // Blue
+    } else if (text == "取消") {
+        // Secondary Button Style (Light Gray or Red text)
+        // Let's use a subtle gray background for Cancel, or Red for destructive
+        button_color = is_hovered ? SDL_Color{255, 59, 48, 30} : SDL_Color{255, 59, 48, 0}; // Transparent red, hover slightly visible
+        text_color = {255, 59, 48, 255}; // Red Text
+    } else {
+        // Default button
+        button_color = is_hovered ? color_button_hover_ : color_button_;
     }
 
-    // 文字/符号居中：将“确定”显示为“○”，“取消”显示为“×”
+    // Button Shadow (Subtle, only for primary)
+    if (text == "确定") {
+        // Simple shadow
+        SDL_Rect shadow_rect = rect;
+        shadow_rect.y += 2;
+        roundedBoxRGBA(renderer_, shadow_rect.x, shadow_rect.y, shadow_rect.x + shadow_rect.w, shadow_rect.y + shadow_rect.h, 8, 0, 0, 0, 30);
+    }
+
+    // Draw Button Background
+    // For "Cancel", only draw if hovered (subtle interaction)
+    if (text == "确定" || (text == "取消" && is_hovered)) {
+        RenderRoundedRect(rect, 8, button_color, true);
+    }
+
+    // Draw Text
     if (font_ && !text.empty()) {
-        std::string display_text = text;
-        if (text == "确定") {
-            display_text = "○";
-        } else if (text == "取消") {
-            display_text = "×";
-        }
-
-        SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font_, display_text.c_str(), text_color);
+        // Center text
+        SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font_, text.c_str(), text_color);
         if (text_surface) {
             int text_w = text_surface->w;
             int text_h = text_surface->h;
@@ -434,10 +467,19 @@ void MNNConvertGUI::RenderCenteredText(const std::string& text, int center_x, in
  */
 void MNNConvertGUI::RenderInputField(const SDL_Rect& rect, const std::string& text, bool is_active) {
     // 绘制输入框背景（圆角）
-    int radius = std::min(rect.h / 2, 10);
+    int radius = 8; // Standard radius
     RenderRoundedRect(rect, radius, color_input_bg_, true);
     
-    // 不绘制边框线条，保持纯色圆角背景
+    // 绘制边框 (Thin border)
+    SDL_Color border_color = is_active ? SDL_Color{0, 122, 255, 255} : SDL_Color{200, 200, 200, 255};
+    RenderRoundedRect(rect, radius, border_color, false);
+    
+    // Focus ring if active
+    if (is_active) {
+         // Draw a second slightly larger rect for focus ring effect? 
+         // Or just make the border thicker.
+         // Let's just keep it simple clean thin blue border.
+    }
     
     // 渲染输入文本 - 使用黑色文字以便在白色背景上可见
     if (!text.empty()) {
@@ -451,7 +493,7 @@ void MNNConvertGUI::RenderInputField(const SDL_Rect& rect, const std::string& te
             }
         }
         int text_y = rect.y + (rect.h - text_h) / 2;
-        RenderText(text, rect.x + 5, text_y, text_color);
+        RenderText(text, rect.x + 10, text_y, text_color);
     }
 
     // 绘制插入光标（闪烁），仅当输入框激活时
@@ -460,18 +502,24 @@ void MNNConvertGUI::RenderInputField(const SDL_Rect& rect, const std::string& te
         Uint32 ticks = SDL_GetTicks();
         bool show_caret = ((ticks / 500) % 2) == 0;
         if (show_caret) {
-            int text_w = 0;
-            int text_h = 0;
+            int cursor_offset = 0;
+            // Calculate cursor offset based on substring before cursor position
             if (!text.empty()) {
-                // 通过TTF计算当前文本宽度，确定光标位置
-                if (TTF_SizeUTF8(font_, text.c_str(), &text_w, &text_h) != 0) {
-                    text_w = 0;
+                // Clamp cursor pos
+                int safe_pos = std::max(0, std::min((int)text.length(), dialog_input_cursor_pos_));
+                std::string sub = text.substr(0, safe_pos);
+                int w = 0, h = 0;
+                if (TTF_SizeUTF8(font_, sub.c_str(), &w, &h) == 0) {
+                    cursor_offset = w;
                 }
             }
-            int caret_x = rect.x + 5 + text_w;
-            int caret_top = rect.y + 6;
-            int caret_bottom = rect.y + rect.h - 6;
-            aalineRGBA(renderer_, caret_x, caret_top, caret_x, caret_bottom, 0, 0, 0, 255);
+
+            int caret_x = rect.x + 10 + cursor_offset;
+            int caret_top = rect.y + 8;
+            int caret_bottom = rect.y + rect.h - 8;
+            // Blue caret
+            aalineRGBA(renderer_, caret_x, caret_top, caret_x, caret_bottom, 0, 122, 255, 255);
+            aalineRGBA(renderer_, caret_x+1, caret_top, caret_x+1, caret_bottom, 0, 122, 255, 255); // Thicker caret
         }
     }
 }
@@ -928,37 +976,87 @@ void MNNConvertGUI::RenderDropZone() {
     // 圆角半径
     int corner_radius = 20;
     
-    // 绘制圆角背景
+    // 1. 绘制阴影 (Apple Style Shadow: diffused and soft)
+    if (!animating_drop_shrink_ && !animating_drop_expand_) { // Only draw shadow when static or expanding?
+        // Draw 3 layers of shadow
+        for (int i = 0; i < 3; i++) {
+            int offset = i * 1;
+            int alpha = 10 - i * 2; // Very subtle: 10, 8, 6
+            if (alpha <= 0) break;
+            
+            roundedBoxRGBA(renderer_, 
+                drop_zone.x + offset, drop_zone.y + offset + 2, 
+                drop_zone.x + drop_zone.w - 1 + offset, drop_zone.y + drop_zone.h - 1 + offset + 4, 
+                corner_radius, 0, 0, 0, alpha);
+        }
+        // One larger soft shadow
+        roundedBoxRGBA(renderer_, 
+            drop_zone.x - 1, drop_zone.y + 2, 
+            drop_zone.x + drop_zone.w + 1, drop_zone.y + drop_zone.h + 6, 
+            corner_radius + 1, 0, 0, 0, 5);
+    }
+
+    // 2. 绘制卡片背景
     RenderRoundedRect(drop_zone, corner_radius, zone_color, true);
     
-    // 不再绘制边框线条
-    
-    // 拖拽区域保持完全空白，不显示任何文字
+    // 3. 绘制边框 (Thin 1px border)
+    // Use RenderRoundedRect with filled=false
+    // If dragging over, make it thicker
+    if (is_dragging_over_) {
+        // Draw thick border
+        RenderRoundedRect(drop_zone, corner_radius, border_color, false);
+        SDL_Rect inner = drop_zone;
+        inner.x += 1; inner.y += 1; inner.w -= 2; inner.h -= 2;
+        RenderRoundedRect(inner, corner_radius - 1, border_color, false);
+    } else {
+        // Normal thin border
+        RenderRoundedRect(drop_zone, corner_radius, border_color, false);
+    }
+
+    // 4. 如果为空闲状态，可以在中间绘制一个大的 "+" 号或图标
+    if (input_file_path_.empty() && !is_dragging_over_ && !is_converting_) {
+        int cx = drop_zone.x + drop_zone.w / 2;
+        int cy = drop_zone.y + drop_zone.h / 2;
+        int size = 40;
+        int thickness = 2;
+        // Draw plus sign (simulated with filled rects)
+        SDL_SetRenderDrawColor(renderer_, 200, 200, 200, 255);
+        SDL_Rect h_bar = {cx - size/2, cy - thickness/2, size, thickness};
+        SDL_Rect v_bar = {cx - thickness/2, cy - size/2, thickness, size};
+        SDL_RenderFillRect(renderer_, &h_bar);
+        SDL_RenderFillRect(renderer_, &v_bar);
+    }
 }
 
 void MNNConvertGUI::GetDropZoneColors(SDL_Color& zone_color, SDL_Color& border_color) const {
+    // Default State (Empty): White Card
+    zone_color = {255, 255, 255, 255}; 
+    border_color = {200, 200, 200, 255}; // Light Gray Border
+
     if (show_conversion_success_) {
-        zone_color = {20, 80, 20, 255};
-        border_color = {50, 200, 50, 255};
+        // Success: Subtle Green Tint
+        zone_color = {240, 255, 240, 255}; 
+        border_color = {52, 199, 89, 255}; // Apple Green
         return;
     }
     if (is_dragging_over_) {
-        zone_color = {200, 200, 200, 255};
-        border_color = {150, 150, 150, 255};
+        // Drag Over: Highlighted Blue Tint
+        zone_color = {235, 245, 255, 255}; 
+        border_color = {0, 122, 255, 255}; // Apple Blue
         return;
     }
     if (is_converting_) {
-        zone_color = {60, 40, 10, 255};
-        border_color = {200, 150, 50, 255};
+        // Converting: Warm Yellow/Gray Tint
+        zone_color = {255, 250, 240, 255};
+        border_color = {255, 149, 0, 255}; // Apple Orange
         return;
     }
     if (!input_file_path_.empty()) {
-        zone_color = {20, 40, 20, 255};
-        border_color = {50, 150, 50, 255};
+        // File Selected: White with active border
+        zone_color = {255, 255, 255, 255};
+        border_color = {100, 100, 100, 255};
         return;
     }
-    zone_color = {20, 40, 20, 255};
-    border_color = {50, 150, 50, 255};
 }
 
 /**
@@ -974,16 +1072,17 @@ void MNNConvertGUI::RenderFileStatusInfo() {
         // 文件转换完成后显示绿色提示2秒
         // Show conversion completed and filename (all in English)
         {
-            std::string filename = GetBaseName(output_file_path_); // Assume output_file_path_ is the saved file path
+            std::string filename = GetBaseName(output_file_path_); 
             std::string display_name = filename.length() > 30 ? filename.substr(0, 27) + "..." : filename;
-            RenderCenteredText("File: " + display_name + " converted successfully", center_x, info_y, {50, 255, 50, 255},{0, 0, 0, 255});
+            // Use Apple Green #34C759
+            RenderCenteredText("File: " + display_name + " converted successfully", center_x, info_y, {52, 199, 89, 255},{0, 0, 0, 255});
         }
     } else if (is_converting_) {
         // Show current file info - compact
         std::string filename = GetBaseName(input_file_path_);
         std::string display_name = filename.length() > 30 ? filename.substr(0, 27) + "..." : filename;
-        // Show yellow progress message when converting
-        RenderCenteredText("Converting file: " + display_name + ", please wait...", center_x, info_y, {255, 200, 50, 255}, {240, 240, 240, 255});
+        // Show Apple Orange #FF9500
+        RenderCenteredText("Converting file: " + display_name + ", please wait...", center_x, info_y, {255, 149, 0, 255}, {240, 240, 240, 255});
     } else if (input_file_path_.empty()) {
         // 弹出输入对话框时不再渲染该提示，避免一帧突变
         if (show_filename_dialog_) {
@@ -995,22 +1094,32 @@ void MNNConvertGUI::RenderFileStatusInfo() {
             Uint32 now = SDL_GetTicks();
             Uint32 elapsed = now - anim_start_time_;
             float t = (anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(anim_duration_ms_));
-            float ease = (t < 0.5f) ? (2.0f * t * t) : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
+            
+            // Use same ease as animation
+            float ease;
+            if (animating_drop_shrink_) {
+                 ease = (t < 0.5f) ? (4.0f * t * t * t) : (1.0f - std::pow(-2.0f * t + 2.0f, 3.0f) / 2.0f);
+            } else {
+                 ease = 1.0f - std::pow(1.0f - t, 4.0f);
+            }
+            
             float factor = animating_drop_shrink_ ? (1.0f - ease) : ease; // 缩小时 1->0, 放大时 0->1
             int a = static_cast<int>(255.0f * factor);
             if (a < 0) a = 0; if (a > 255) a = 255;
             alpha = static_cast<Uint8>(a);
         }
-        SDL_Color fg = {0, 0, 0, alpha};
+        // Apple Dark Gray for text #1D1D1F
+        SDL_Color fg = {29, 29, 31, alpha};
         SDL_Color bg = {255, 255, 255, 255};
-        RenderCenteredText("Drag and drop an .onnx file onto the area above to convert automatically", center_x, info_y, fg, bg);
+        RenderCenteredText("Drag and drop an .onnx file here to convert", center_x, info_y, fg, bg);
     } else {
-        std::string filename = GetBaseName(output_file_path_); // Assume output_file_path_ is the saved file path
+        std::string filename = GetBaseName(output_file_path_); 
         std::string display_name = filename.length() > 30 ? filename.substr(0, 27) + "..." : filename;
         // Show current file info - compact English version
+        // Secondary Label Color #8E8E93
         RenderCenteredText(
-            "File: " + display_name + " converted. Drag another .onnx file above to convert again.",
-            center_x, info_y, {120, 120, 120, 255}, {240, 240, 240, 255}
+            "File: " + display_name + " converted. Drag another .onnx file to convert again.",
+            center_x, info_y, {142, 142, 147, 255}, {240, 240, 240, 255}
         );
     }
 }
@@ -1572,6 +1681,7 @@ void MNNConvertGUI::ShowFilenameDialog() {
     // 预填充为配置里的 record_file_name
     dialog_filename_input_ = config_manager_.GetRecordFileName();
     dialog_input_active_ = true;
+    dialog_input_cursor_pos_ = dialog_filename_input_.length(); // Set cursor to end
     
     // 计算对话框位置和大小
     int dialog_width = 400;
@@ -1672,10 +1782,19 @@ void MNNConvertGUI::UpdateDropZoneAnimation() {
     Uint32 now = SDL_GetTicks();
     Uint32 elapsed = now - anim_start_time_;
     float t = (anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(anim_duration_ms_));
-    // 缓入缓出（ease-in-out，采用二次插值）
-    float ease = (t < 0.5f)
-        ? (2.0f * t * t)
-        : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
+    // 缓入缓出 (Apple style - Quartic Ease Out for smooth deceleration)
+    // t goes from 0 to 1
+    float ease;
+    if (animating_drop_shrink_) {
+        // Shrinking: use smooth ease-in-out or just ease-out
+        // Let's use a standard cubic ease-in-out for shrinking to dialog
+        ease = (t < 0.5f) ? (4.0f * t * t * t) : (1.0f - std::pow(-2.0f * t + 2.0f, 3.0f) / 2.0f);
+    } else {
+        // Expanding: use a spring-like elastic ease-out or simpler quartic ease-out
+        // Quartic Ease Out: 1 - (1-t)^4
+        ease = 1.0f - std::pow(1.0f - t, 4.0f);
+    }
+
     auto lerp = [&](int a, int b) -> int { return a + static_cast<int>((b - a) * ease); };
     drop_rect_current_.x = lerp(drop_rect_start_.x, drop_rect_target_.x);
     drop_rect_current_.y = lerp(drop_rect_start_.y, drop_rect_target_.y);
@@ -1748,38 +1867,32 @@ void MNNConvertGUI::CancelFilenameInput() {
  * @brief 渲染文件名输入对话框
  */
 void MNNConvertGUI::RenderFilenameDialog() {
-    // 绘制半透明背景遮罩
-    SDL_SetRenderDrawColor(renderer_, 255, 255, 255, 255);
+    // 绘制半透明背景遮罩 (Dimming)
+    SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 100); // Darker dim
     SDL_Rect mask = {0, 0, window_width_, window_height_};
     SDL_RenderFillRect(renderer_, &mask);
     
-    // 绘制对话框背景（圆角）
+    // 绘制对话框阴影 (Deep Shadow)
     int dialog_radius = 12;
-    SDL_Color dialog_bg = {220, 220, 220, 255};
-    if (dialog_bg_animating_) {
-        Uint32 now = SDL_GetTicks();
-        Uint32 elapsed = now - dialog_bg_anim_start_;
-        float t = (dialog_bg_anim_duration_ms_ == 0) ? 1.0f : std::min(1.0f, elapsed / static_cast<float>(dialog_bg_anim_duration_ms_));
-        // 缓入缓出
-        float ease = (t < 0.5f) ? (2.0f * t * t) : (1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f);
-        auto lerpC = [&](Uint8 a, Uint8 b) -> Uint8 { return static_cast<Uint8>(a + (b - a) * ease); };
-        dialog_bg.r = lerpC(dialog_bg_start_color_.r, dialog_bg_target_color_.r);
-        dialog_bg.g = lerpC(dialog_bg_start_color_.g, dialog_bg_target_color_.g);
-        dialog_bg.b = lerpC(dialog_bg_start_color_.b, dialog_bg_target_color_.b);
-        dialog_bg.a = lerpC(dialog_bg_start_color_.a, dialog_bg_target_color_.a);
-        if (t >= 1.0f) {
-            dialog_bg_animating_ = false;
-        }
+    // Multi-layer shadow for depth
+    for(int i=0; i<8; ++i) {
+        roundedBoxRGBA(renderer_, 
+            dialog_rect_.x - i, dialog_rect_.y + i + 5, 
+            dialog_rect_.x + dialog_rect_.w + i, dialog_rect_.y + dialog_rect_.h + i + 8, 
+            dialog_radius + 2, 0, 0, 0, 5);
     }
+
+    // 绘制对话框背景（圆角）
+    SDL_Color dialog_bg = {255, 255, 255, 255}; // Pure white
     RenderRoundedRect(dialog_rect_, dialog_radius, dialog_bg, true);
     
     // 绘制标题
-    RenderCenteredText("输入转换后的文件名字（不含扩展名）", dialog_rect_.x + dialog_rect_.w / 2, dialog_rect_.y + 20, {0, 0, 0, 255}, {240, 240, 240, 255});
+    RenderCenteredText("输入转换后的文件名字", dialog_rect_.x + dialog_rect_.w / 2, dialog_rect_.y + 25, {0, 0, 0, 255}, {255, 255, 255, 255});
     
     // 显示输入文件信息
     std::string input_filename = GetBaseName(pending_input_file_path_);
     std::string display_name = input_filename.length() > 25 ? input_filename.substr(0, 22) + "..." : input_filename;
-    RenderCenteredText("输入文件: " + display_name, dialog_rect_.x + dialog_rect_.w / 2, dialog_rect_.y + 45, {100, 100, 100, 255}, {240, 240, 240, 255});
+    RenderCenteredText(display_name, dialog_rect_.x + dialog_rect_.w / 2, dialog_rect_.y + 55, {142, 142, 147, 255}, {255, 255, 255, 255});
     
     // 绘制输入框
     RenderInputField(dialog_input_rect_, dialog_filename_input_, dialog_input_active_);
@@ -1848,12 +1961,30 @@ void MNNConvertGUI::HandleDialogKeyInput(SDL_Keycode key, const std::string& tex
     
     // 处理文本输入
     if (dialog_input_active_) {
-        if (key == SDLK_BACKSPACE && !dialog_filename_input_.empty()) {
-            // 删除最后一个字符
-            dialog_filename_input_.pop_back();
+        // Handle cursor movement
+        if (key == SDLK_LEFT) {
+            if (dialog_input_cursor_pos_ > 0) {
+                dialog_input_cursor_pos_--;
+            }
+        } else if (key == SDLK_RIGHT) {
+            if (dialog_input_cursor_pos_ < (int)dialog_filename_input_.length()) {
+                dialog_input_cursor_pos_++;
+            }
+        } else if (key == SDLK_BACKSPACE) {
+            if (!dialog_filename_input_.empty() && dialog_input_cursor_pos_ > 0) {
+                // Delete character BEFORE cursor
+                dialog_filename_input_.erase(dialog_input_cursor_pos_ - 1, 1);
+                dialog_input_cursor_pos_--;
+            }
+        } else if (key == SDLK_DELETE) {
+            if (dialog_input_cursor_pos_ < (int)dialog_filename_input_.length()) {
+                // Delete character AFTER cursor
+                dialog_filename_input_.erase(dialog_input_cursor_pos_, 1);
+            }
         } else if (!text_input.empty() && text_input[0] >= 32 && text_input[0] <= 126) {
-            // 添加字符到文件名
-            dialog_filename_input_ += text_input;
+            // Insert character at cursor position
+            dialog_filename_input_.insert(dialog_input_cursor_pos_, text_input);
+            dialog_input_cursor_pos_ += text_input.length();
         }
     }
 }

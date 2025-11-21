@@ -89,6 +89,7 @@ private:
     SDL_Rect dialog_ok_button_;
     SDL_Rect dialog_cancel_button_;
     bool dialog_input_active_;
+    int dialog_input_cursor_pos_; // Cursor position index
     
     // 鼠标位置
     int mouse_x_;

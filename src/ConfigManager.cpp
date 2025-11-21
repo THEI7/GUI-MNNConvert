@@ -23,8 +23,8 @@ ConfigManager::~ConfigManager() {
  * @brief 初始化默认配置值
  */
 void ConfigManager::InitializeDefaults() {
-    config_["mnnconvert_path"] = "/home/pozion/tools/MNN/MNNConvert";
-    config_["output_dir"] = "/home/pozion/tools/MNN";
+    config_["mnnconvert_path"] = "/home/fangjunjie/tools/MNN/MNNConvert";
+    config_["output_dir"] = "/home/fangjunjie/tools/MNN";
     config_["biz_code"] = "biz";
     config_["auto_open_output_dir"] = true;
     config_["default_font"] = "";
@@ -52,12 +52,12 @@ bool ConfigManager::LoadConfig(const std::string& config_path) {
         bool config_modified = false;
         
         if (!config_["mnnconvert_path"]) {
-            config_["mnnconvert_path"] = "/home/pozion/tools/MNN/MNNConvert";
+            config_["mnnconvert_path"] = "/home/fangjunjie/tools/MNN/MNNConvert";
             config_modified = true;
         }
         
         if (!config_["output_dir"]) {
-            config_["output_dir"] = "/home/pozion/tools/MNN";
+            config_["output_dir"] = "/home/fangjunjie/tools/MNN";
             config_modified = true;
         }
         
@@ -148,7 +148,7 @@ std::string ConfigManager::GetMNNConvertPath() const {
     if (config_["mnnconvert_path"]) {
         return config_["mnnconvert_path"].as<std::string>();
     }
-    return "/home/pozion/tools/MNN/MNNConvert";
+    return "/home/fangjunjie/tools/MNN/MNNConvert";
 }
 
 /**
@@ -158,7 +158,7 @@ std::string ConfigManager::GetOutputDirectory() const {
     if (config_["output_dir"]) {
         return config_["output_dir"].as<std::string>();
     }
-    return "/home/pozion/tools/MNN";
+    return "/home/fangjunjie/tools/MNN";
 }
 
 /**
